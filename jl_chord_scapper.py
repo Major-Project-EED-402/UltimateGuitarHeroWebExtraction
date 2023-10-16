@@ -62,3 +62,55 @@ class ChordExtractor:
         }
         
         return info
+
+class LinkExtractor:
+    BASE_URL = "https://www.ultimate-guitar.com/explore?&type[]=Chords"
+
+    def __init__(self):
+        self.driver = self.initiate_chrome_driver()
+        self.first_time = True
+    
+    def initiate_chrome_driver(self):
+        driver = webdriver.Chrome()
+        return driver
+    
+    def execute_CTA_accept_cookies(self):
+        try:
+            CTA_button = self.driver.find_element(By.XPATH, '//button[contains(text(), "thanks")]')
+            CTA_button.click()
+        except:
+            print('cookies banner not found in site')
+    
+    def link_to_song_dict(self,link, genre, decade):
+        return {
+            "name": link.contents[0],
+            "url": link['href'],
+            "genre": genre["name"],
+            "decade": decade["name"]
+        }
+    
+    def get_links_single_page(self,genreFilter,decadeFilter, pageFilter):
+        self.driver.get(f'{self.BASE_URL}{genreFilter}{decadeFilter}{pageFilter}')
+        
+        if self.driver.page_source == '<html><head></head><body></body></html>':
+            raise Exception('Denegation error')
+
+        if self.first_time:
+            self.click_on_accept_cookies()
+            self.first_time = False
+
+        soup = BeautifulSoup(self.driver.page_source, 'lxml')
+
+        return soup.findAll('a', {"class":"_2KJtL _1mes3 kWOod"})
+    
+    def get_all_filter_song_links(self,genreFilter,decadeFilter, first_page, last_page):
+        list_of_list = [self.get_links_single_page(genreFilter, decadeFilter, f'&page={page}')
+                  for page in range(first_page,last_page + 1)]
+        
+        return reduce(lambda list1, list2: [*list1, *list2], list_of_list)
+    
+    def get_all_songs(self, genre, decade, starting_page, ending_page):
+        links = self.get_all_filter_song_links(genre['pattern'],decade['pattern'], starting_page, ending_page)
+        result = [ self.link_to_song_dict(link,genre,decade) for link in links]
+        
+        return result
