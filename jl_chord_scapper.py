@@ -114,3 +114,64 @@ class LinkExtractor:
         result = [ self.link_to_song_dict(link,genre,decade) for link in links]
         
         return result
+
+
+class ChordScraper:
+    def __init__(self, linkExtractor, chordExtractor, genres, decades, song_data):
+        self.linkExtractor = linkExtractor
+        self.chordExtractor = chordExtractor
+        self.genres = genres
+        self.decades = decades
+        self.song_data = song_data
+        
+        self.combinations = []
+
+        for decade in self.decades:
+            for genre in self.genres:
+                    self.combinations.append( {"decade": decade, "genre": genre})
+        
+    def extract(self, first_page, last_page):      
+        startIndex = 1
+        
+        return self.extract_from(startIndex, first_page, last_page)
+    
+    def extract_from(self, startIndexBase1,first_page, last_page):    
+        for index, combination in enumerate(self.combinations[startIndexBase1 - 1:]):
+            new_extracted_songs = []
+            genre = combination["genre"]
+            decade = combination["decade"]
+            
+            if self.song_data.has_genre_and_decade(genre["name"], decade["name"]):
+                print(f'{genre["name"]},{decade["name"]} already extracted')
+                continue
+            
+            song_basic_data_array = []          
+            try:
+                song_basic_data_array = self.linkExtractor.get_all_songs(genre,decade, first_page, last_page)
+                      
+                for basic_data in song_basic_data_array:
+                    self.song_data.add_basic_data(basic_data)
+                      
+                new_extracted_songs = [self.extract_song_data(index,song) for index,song in enumerate(new_extracted_songs)]
+            except Exception as e: 
+                print(f'Error in ({genre["name"]},{decade["name"]})')
+                raise e
+            
+            for index,song in enumerate(song_basic_data_array):
+                try:
+                    self.extract_song_data(index,song)
+                except Exception as e: 
+                    print(f'Error in "{song["name"]}"')
+                    raise e
+            
+            number_of_songs = len(self.song_data.df)
+            print(f'Extracted {index+startIndexBase1} of {len(self.combinations)} ({genre["name"]},{decade["name"]}). {number_of_songs} in total')  
+        
+    def extract_song_data(self,index,song): 
+        if self.song_data.has_chords(song["url"]):
+            print(f'Song {index}. "{song["name"]}" already extracted')  
+            return
+      
+        song_details = self.chordExtractor.extract_song_data(song["url"])           
+        self.song_data.add_details(song_details)
+        print(f'Extracted data from song {index}. "{song["name"]}"')
